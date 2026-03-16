@@ -1,6 +1,4 @@
 """
-Interview Study Gateway (single-file learning scaffold)
-
 This file condenses the core ideas from claw0 s01-s10 into one runnable script:
 1) Agent loop + stop_reason
 2) Tool schema + dispatch table
