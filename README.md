@@ -1,6 +1,6 @@
-# LLM Agent Gateway / Agent Runtime
+# LLM Agent 
 
-一个以单文件实现为核心的个人项目，用来展示我如何从零设计并实现一个可运行的 LLM Agent Runtime。仓库中的核心入口是 [agent.py](agent.py)：它把 **Agent Loop、Tool Calling、Memory、Gateway Routing、Session Isolation、Heartbeat/Cron、Delivery Queue、Failover、Named-Lane Concurrency** 串成了一个完整的可执行系统。
+一个以单文件实现为核心的个人项目，用来展示我如何从零设计并实现一个可运行的 LLM Agent 。仓库中的核心入口是 [agent.py](agent.py)：它把 **Agent Loop、Tool Calling、Memory、Gateway Routing、Session Isolation、Heartbeat/Cron、Delivery Queue、Failover、Named-Lane Concurrency** 串成了一个完整的可执行系统。
 
 这个实现是一个 **interview-study gateway / runnable architecture scaffold**：当前默认使用 `MockLLM`，可以离线运行，不依赖真实外部模型服务；但整体代码结构、状态流转、故障处理和模块边界，都是按真实 Agent Gateway / Agent Runtime 的思路组织的，适合作为 GitHub 项目展示、面试讲解样例，以及后续演进成真实服务的基础。
 
@@ -14,7 +14,7 @@
 - 如何做多 Agent 路由、会话隔离和后台任务调度。
 - 如何在发送失败、模型失败、上下文过载时继续稳定运行。
 
-`workspace/claw.py` 的目标，就是把这些能力压缩进一个可阅读、可运行、可讲解的单文件 Agent Runtime 中。
+该项目的目标，就是把这些能力压缩进一个可阅读、可运行、可讲解的单文件 Agent Runtime 中。
 
 ## 核心能力概览
 
@@ -29,7 +29,7 @@
 
 ```text
                          +------------------------------+
-Inbound Message -------->|  InterviewGateway.run_turn  |
+Inbound Message -------->|  agent.run_turn  |
 (cli / telegram / etc.)  +--------------+---------------+
                                         |
                                         v
@@ -91,9 +91,7 @@ Background lanes:
   main lane      -> user-facing synchronous work
 ```
 
-## 简历项目点位与代码映射
-
-这一节逐条对应我在简历中对项目的描述，并明确它们在 `workspace/claw.py` 中是如何落地的。
+## 代码映射
 
 ### 1. 基于 LLM Agent Architecture 构建完整 Agent Loop
 
@@ -103,7 +101,7 @@ Background lanes:
 
 代码落地：
 
-- `InterviewGateway.run_turn()` 是整个 agent turn 的入口。
+- `agent.run_turn()` 是整个 agent turn 的入口。
 - 模型响应返回 `LLMResponse(stop_reason, content)`。
 - 当 `stop_reason == "tool_use"` 时，runtime 会遍历所有 `tool_use` block，调用 `ToolRegistry.call()` 执行工具。
 - 工具结果被包装成 `tool_result` block，再作为下一轮 user content 回灌给模型，这就是 Observation。
@@ -148,7 +146,7 @@ Background lanes:
   - 每个 session 使用 append-only JSONL 存储消息历史。
   - `load_messages()` 会把 JSONL 重建成模型可直接消费的 `messages` 结构。
 - **Long-term memory**
-  - `MemoryStore` 同时读取 evergreen memory [workspace/MEMORY.md](workspace/MEMORY.md)。
+  - `MemoryStore` 同时读取 evergreen memory [MEMORY.md](MEMORY.md)。
   - 也把每日写入的记忆保存在 `workspace/.interview_data/memory/daily/*.jsonl`。
 - **Retrieval Recall**
   - `MemoryStore.search()` 基于纯 Python TF-IDF + cosine similarity 做检索。
@@ -520,39 +518,39 @@ read README.md
 
 ### Bootstrap / prompt files
 
-- [workspace/IDENTITY.md](workspace/IDENTITY.md)
+- [IDENTITY.md](IDENTITY.md)
   - 定义 agent 的身份基线。
-- [workspace/SOUL.md](workspace/SOUL.md)
+- [SOUL.md](SOUL.md)
   - 定义 agent 的人格、语气和行为风格。
-- [workspace/TOOLS.md](workspace/TOOLS.md)
+- [TOOLS.md](TOOLS.md)
   - 定义工具使用规范。
-- [workspace/USER.md](workspace/USER.md)
+- [USER.md](USER.md)
   - 存放用户侧偏好或上下文说明。
-- [workspace/AGENTS.md](workspace/AGENTS.md)
+- [AGENTS.md](AGENTS.md)
   - 描述多 agent 运行方式和隔离边界。
-- [workspace/BOOTSTRAP.md](workspace/BOOTSTRAP.md)
+- [BOOTSTRAP.md](BOOTSTRAP.md)
   - 提供额外系统初始化说明。
-- [workspace/HEARTBEAT.md](workspace/HEARTBEAT.md)
+- [HEARTBEAT.md](HEARTBEAT.md)
   - 定义 heartbeat 定时检查的目标与输出规则。
-- [workspace/MEMORY.md](workspace/MEMORY.md)
+- [MEMORY.md](MEMORY.md)
   - 提供 evergreen memory，作为长期记忆基底。
 
 ### Scheduled task config
 
-- [workspace/CRON.json](workspace/CRON.json)
+- [CRON.json](CRON.json)
   - 定义定时任务列表，由 `CronService` 加载。
 
 ### Skills
 
-- [workspace/skills/example-skill/SKILL.md](workspace/skills/example-skill/SKILL.md)
+- [skills/example-skill/SKILL.md](skills/example-skill/SKILL.md)
   - 示例 skill 文件，`SkillsManager` 会自动扫描并注入 prompt。
 
 ## 持久化数据目录
 
-运行 `python workspace/claw.py` 后，数据会写入 `workspace/.interview_data/`。
+运行 `python agent.py` 后，数据会写入 `.running_data/`。
 
 ```text
-workspace/.interview_data/
+.running_data/
   sessions/             会话 JSONL 与 session map
   delivery-queue/       pending delivery items
   delivery-queue/failed/ 投递失败的消息
@@ -583,15 +581,13 @@ workspace/.interview_data/
 - Delivery Queue + retry/backoff
 - failure classification + profile rotation + fallback model
 
-### 当前未实现或故意简化
+### 当前未实现
 
 - 没有接真实外部 LLM API，默认使用 `MockLLM`
 - 没有完整 HTTP / WebSocket 网关服务层
 - 没有真实多进程 / 多机部署
 - 没有生产级权限系统、监控系统和外部存储
 - 当前 memory retrieval 使用纯 Python TF-IDF，而不是向量数据库
-
-因此，README 中把它描述为 **single-file agent runtime / interview-study gateway** 是准确的；把它描述成“已上线的生产集群系统”则不准确。
 
 ## 项目亮点总结
 
